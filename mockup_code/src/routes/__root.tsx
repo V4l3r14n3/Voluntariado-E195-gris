@@ -1,8 +1,7 @@
-import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { Outlet, Link, createRootRoute } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth-context";
 import { AppLayout } from "@/components/AppLayout";
 import { Toaster } from "sonner";
-import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
   return (
@@ -22,36 +21,9 @@ function NotFoundComponent() {
 }
 
 export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Volunteero— Volunteer Management System" },
-      { name: "description", content: "A comprehensive volunteer management platform for organizations and volunteers." },
-      { property: "og:title", content: "Volunteero— Volunteer Management System" },
-      { name: "twitter:title", content: "Volunteero— Volunteer Management System" },
-      { property: "og:description", content: "A comprehensive volunteer management platform for organizations and volunteers." },
-      { name: "twitter:description", content: "A comprehensive volunteer management platform for organizations and volunteers." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d2de98fe-64eb-4223-9478-3bdd6985657b/id-preview-16a1a535--69bfa503-ae0e-4b34-8365-e58a446ff831.lovable.app-1775876758823.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d2de98fe-64eb-4223-9478-3bdd6985657b/id-preview-16a1a535--69bfa503-ae0e-4b34-8365-e58a446ff831.lovable.app-1775876758823.png" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { property: "og:type", content: "website" },
-    ],
-    links: [{ rel: "stylesheet", href: appCss }],
-  }),
-  shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
 });
-
-function RootShell({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <head><HeadContent /></head>
-      <body>{children}<Scripts /></body>
-    </html>
-  );
-}
 
 function RootComponent() {
   return (
