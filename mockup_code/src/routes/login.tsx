@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
@@ -30,9 +31,10 @@ function LoginForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
-  const [securityAnswer, setSecurityAnswer] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
     if (!email) errs.email = "Email is required";
@@ -40,30 +42,33 @@ function LoginForm() {
     if (password && password.length < 6) errs.password = "Password must be at least 6 characters";
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
-    const success = login(email, password);
-    if (success) {
+    setSubmitting(true);
+    const result = await login(email, password);
+    setSubmitting(false);
+    if (result.ok) {
       toast.success("Login successful!");
       navigate({ to: "/dashboard" });
     } else {
-      toast.error("Invalid credentials");
+      toast.error(result.error ?? "Invalid credentials");
     }
   };
 
-  const handleForgotPassword = (e: React.FormEvent) => {
+  const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotEmail || !securityAnswer) {
-      toast.error("Please fill in all fields");
+    if (!forgotEmail) {
+      toast.error("Email is required");
       return;
     }
-    toast.success("Password reset link sent to your email!");
-    setShowForgot(false);
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+      redirectTo: `${window.location.origin}/login`,
+    });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Password reset link sent to your email");
+      setShowForgot(false);
+    }
   };
-
-  const demoAccounts = [
-    { role: "Admin", email: "admin@vms.org" },
-    { role: "Org", email: "org@greenearth.org" },
-    { role: "Volunteer", email: "jane@email.com" },
-  ];
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -130,27 +135,18 @@ function LoginForm() {
 
               <motion.button
                 type="submit"
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.98 }}
-                className="w-full py-2 bg-primary text-primary-foreground text-sm font-medium rounded-sm hover:bg-primary/90 transition-colors"
+                disabled={submitting}
+                whileHover={{ scale: submitting ? 1 : 1.01 }}
+                whileTap={{ scale: submitting ? 1 : 0.98 }}
+                className="w-full py-2 bg-primary text-primary-foreground text-sm font-medium rounded-sm hover:bg-primary/90 transition-colors disabled:opacity-60"
               >
-                Sign In
+                {submitting ? "Signing in…" : "Sign In"}
               </motion.button>
             </form>
 
             <button onClick={() => setShowForgot(true)} className="text-sm text-primary hover:underline mt-4 block text-center w-full">
               Forgot password?
             </button>
-
-            <div className="mt-6 pt-4 border-t border-border text-center text-sm text-muted-foreground">
-              <p className="mb-2">Demo accounts:</p>
-              <div className="flex flex-col gap-1 text-xs">
-                {demoAccounts.map(acc => (
-                  <span key={acc.role}><strong>{acc.role}:</strong>{` ${acc.email}`}</span>
-                ))}
-              </div>
-              <p className="text-xs mt-2 text-muted-foreground">Any password works for demo</p>
-            </div>
 
             <div className="mt-4 text-center">
               <span className="text-sm text-muted-foreground">Don't have an account? </span>
@@ -167,16 +163,12 @@ function LoginForm() {
             className="bg-card border border-border rounded-sm p-6 shadow-sm"
           >
             <h2 className="text-lg font-semibold mb-1">Reset Password</h2>
-            <p className="text-sm text-muted-foreground mb-6">Answer your security question</p>
+            <p className="text-sm text-muted-foreground mb-6">Receive a reset link via email</p>
 
             <form onSubmit={handleForgotPassword} className="flex flex-col gap-4">
               <div>
                 <label className="text-sm font-medium mb-1 block">Email</label>
                 <input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} className="w-full px-3 py-2 text-sm border border-input rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="you@example.com" />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Security Question Answer</label>
-                <input type="text" value={securityAnswer} onChange={e => setSecurityAnswer(e.target.value)} className="w-full px-3 py-2 text-sm border border-input rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Your answer" />
               </div>
               <motion.button
                 type="submit"
@@ -184,7 +176,7 @@ function LoginForm() {
                 whileTap={{ scale: 0.98 }}
                 className="w-full py-2 bg-primary text-primary-foreground text-sm font-medium rounded-sm hover:bg-primary/90 transition-colors"
               >
-                Reset Password
+                Send Reset Link
               </motion.button>
             </form>
             <button onClick={() => setShowForgot(false)} className="text-sm text-primary hover:underline mt-4 block text-center w-full">

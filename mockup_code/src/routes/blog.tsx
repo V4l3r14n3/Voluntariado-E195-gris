@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { mockBlogPosts, type BlogPost } from "@/lib/mock-data";
+import { useBlogPosts, useCreateBlogPost, useUpdateBlogPost, useDeleteBlogPost } from "@/lib/queries/blog";
+import type { BlogPost } from "@/lib/mock-data";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, BookOpen, Image } from "lucide-react";
 
@@ -12,7 +13,10 @@ export const Route = createFileRoute("/blog")({
 function BlogPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [posts, setPosts] = useState<BlogPost[]>(mockBlogPosts);
+  const { data: posts = [] } = useBlogPosts();
+  const createMut = useCreateBlogPost();
+  const updateMut = useUpdateBlogPost();
+  const deleteMut = useDeleteBlogPost();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<BlogPost | null>(null);
   const [title, setTitle] = useState("");
@@ -23,6 +27,7 @@ function BlogPage() {
   if (!user) { navigate({ to: "/" }); return null; }
 
   const isOrg = user.role === 'organization';
+  const orgId = user.organization_id;
 
   const resetForm = () => { setTitle(""); setContent(""); setEditing(null); setShowForm(false); };
 
@@ -30,28 +35,32 @@ function BlogPage() {
     setEditing(post); setTitle(post.title); setContent(post.content); setShowForm(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !content.trim()) { toast.error("Title and content are required"); return; }
+    if (!orgId) { toast.error("No organization linked"); return; }
 
-    if (editing) {
-      setPosts(prev => prev.map(p => p.id === editing.id ? { ...p, title, content } : p));
-      toast.success("Blog post updated!");
-    } else {
-      const newPost: BlogPost = {
-        id: 'bp-' + Date.now(), title, content, authorName: user.name,
-        organizationId: 'org1', organizationName: user.organization || user.name,
-        createdAt: new Date().toISOString().split('T')[0],
-      };
-      setPosts(prev => [newPost, ...prev]);
-      toast.success("Blog post published!");
+    try {
+      if (editing) {
+        await updateMut.mutateAsync({ id: editing.id, updates: { title, content } });
+        toast.success("Blog post updated!");
+      } else {
+        await createMut.mutateAsync({ title, content, author_id: user.id, organization_id: orgId });
+        toast.success("Blog post published!");
+      }
+      resetForm();
+    } catch (err) {
+      toast.error((err as Error).message);
     }
-    resetForm();
   };
 
-  const handleDelete = (id: string) => {
-    setPosts(prev => prev.filter(p => p.id !== id));
-    toast.success("Blog post deleted");
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteMut.mutateAsync(id);
+      toast.success("Blog post deleted");
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
     setDeleteConfirm(null);
   };
 

@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { mockOrganizations, type Organization } from "@/lib/mock-data";
+import { useOrganizations, useUpdateOrganization } from "@/lib/queries/organizations";
+import type { Organization } from "@/lib/mock-data";
 import { toast } from "sonner";
 import { CheckCircle2, XCircle, Clock, FileText, Upload } from "lucide-react";
 
@@ -12,23 +13,32 @@ export const Route = createFileRoute("/admin/organizations")({
 function AdminOrganizationsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [orgs, setOrgs] = useState<Organization[]>(mockOrganizations);
+  const { data: orgs = [] } = useOrganizations();
+  const updateMut = useUpdateOrganization();
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [rejectionMessage, setRejectionMessage] = useState("");
   const [showRejectDialog, setShowRejectDialog] = useState(false);
 
   if (!user || user.role !== 'admin') { navigate({ to: "/" }); return null; }
 
-  const handleApprove = (org: Organization) => {
-    setOrgs(prev => prev.map(o => o.id === org.id ? { ...o, status: 'approved' as const } : o));
-    toast.success(`${org.name} has been approved!`);
+  const handleApprove = async (org: Organization) => {
+    try {
+      await updateMut.mutateAsync({ id: org.id, updates: { status: 'approved', rejection_message: null } });
+      toast.success(`${org.name} has been approved!`);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
   };
 
-  const handleReject = () => {
+  const handleReject = async () => {
     if (!selectedOrg) return;
     if (!rejectionMessage.trim()) { toast.error("Please provide a rejection reason"); return; }
-    setOrgs(prev => prev.map(o => o.id === selectedOrg.id ? { ...o, status: 'rejected' as const, rejectionMessage } : o));
-    toast.success(`${selectedOrg.name} has been rejected`);
+    try {
+      await updateMut.mutateAsync({ id: selectedOrg.id, updates: { status: 'rejected', rejection_message: rejectionMessage } });
+      toast.success(`${selectedOrg.name} has been rejected`);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
     setShowRejectDialog(false);
     setSelectedOrg(null);
     setRejectionMessage("");

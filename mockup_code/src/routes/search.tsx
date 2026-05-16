@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { mockOpportunities, type Opportunity } from "@/lib/mock-data";
+import { useOpportunities, useApplyToOpportunity } from "@/lib/queries/opportunities";
+import type { Opportunity } from "@/lib/mock-data";
 import { toast } from "sonner";
 import { Search as SearchIcon, MapPin, Calendar, Building2, CheckCircle2 } from "lucide-react";
 
@@ -12,7 +13,8 @@ export const Route = createFileRoute("/search")({
 function SearchPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [opportunities, setOpportunities] = useState<Opportunity[]>(mockOpportunities.filter(o => o.published));
+  const { data: opportunities = [], isLoading } = useOpportunities({ onlyPublished: true });
+  const applyMutation = useApplyToOpportunity();
   const [titleFilter, setTitleFilter] = useState("");
   const [cityFilter, setCityFilter] = useState("");
   const [orgFilter, setOrgFilter] = useState("");
@@ -28,9 +30,13 @@ function SearchPage() {
     (!dateFilter || o.date === dateFilter)
   );
 
-  const handleApply = (opp: Opportunity) => {
-    setOpportunities(prev => prev.map(o => o.id === opp.id ? { ...o, applicants: [...o.applicants, user.id] } : o));
-    toast.success("Successfully registered for " + opp.title + "!");
+  const handleApply = async (opp: Opportunity) => {
+    try {
+      await applyMutation.mutateAsync({ opportunityId: opp.id, userId: user.id });
+      toast.success("Successfully registered for " + opp.title + "!");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
     setApplyConfirm(null);
   };
 
@@ -85,11 +91,14 @@ function SearchPage() {
             )}
           </div>
         ))}
-        {filtered.length === 0 && (
+        {!isLoading && filtered.length === 0 && (
           <div className="col-span-2 text-center py-12 text-muted-foreground">
             <SearchIcon className="size-8 mx-auto mb-3 opacity-50" />
             <p className="text-sm">No opportunities found matching your filters.</p>
           </div>
+        )}
+        {isLoading && (
+          <div className="col-span-2 text-center py-12 text-muted-foreground text-sm">Loading…</div>
         )}
       </div>
 

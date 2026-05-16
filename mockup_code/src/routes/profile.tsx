@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { UserCircle, Lock, HelpCircle } from "lucide-react";
 
@@ -15,25 +16,33 @@ function ProfilePage() {
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [changingPassword, setChangingPassword] = useState(false);
-  const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNew, setConfirmNew] = useState("");
 
   if (!user) { navigate({ to: "/" }); return null; }
 
-  const handleSave = () => {
-    updateProfile({ name, email });
+  const handleSave = async () => {
+    const result = await updateProfile({ name });
+    if (!result.ok) { toast.error(result.error ?? "Update failed"); return; }
+    if (email !== user.email) {
+      const { error } = await supabase.auth.updateUser({ email });
+      if (error) { toast.error(`Email update: ${error.message}`); return; }
+      toast.success("Profile updated. Check both emails to confirm address change.");
+    } else {
+      toast.success("Profile updated successfully!");
+    }
     setEditing(false);
-    toast.success("Profile updated successfully!");
   };
 
-  const handlePasswordChange = (e: React.FormEvent) => {
+  const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword.length < 6) { toast.error("Password must be at least 6 characters"); return; }
     if (newPassword !== confirmNew) { toast.error("Passwords don't match"); return; }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) { toast.error(error.message); return; }
     toast.success("Password changed successfully!");
     setChangingPassword(false);
-    setOldPassword(""); setNewPassword(""); setConfirmNew("");
+    setNewPassword(""); setConfirmNew("");
   };
 
   return (
@@ -81,7 +90,7 @@ function ProfilePage() {
           {user.organization && (
             <div>
               <label className="text-sm font-medium text-muted-foreground mb-1 block">Organization</label>
-              <div className="text-sm">{user.organization}</div>
+              <div className="text-sm">{user.organization.name}</div>
             </div>
           )}
         </div>
@@ -99,7 +108,6 @@ function ProfilePage() {
             </button>
           ) : (
             <form onSubmit={handlePasswordChange} className="flex flex-col gap-3 max-w-sm">
-              <input type="password" value={oldPassword} onChange={e => setOldPassword(e.target.value)} placeholder="Current password" className="px-3 py-2 text-sm border border-input rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
               <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="New password" className="px-3 py-2 text-sm border border-input rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
               <input type="password" value={confirmNew} onChange={e => setConfirmNew(e.target.value)} placeholder="Confirm new password" className="px-3 py-2 text-sm border border-input rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
               <div className="flex gap-2">
@@ -118,7 +126,7 @@ function ProfilePage() {
         </div>
         <div className="p-5">
           <div className="text-sm text-muted-foreground mb-2">Your security question is set. It will be used to recover your password.</div>
-          <div className="text-sm font-medium">{user.securityQuestion || "What is your pet's name?"}</div>
+          <div className="text-sm font-medium">{user.security_question || "What is your pet's name?"}</div>
         </div>
       </div>
 

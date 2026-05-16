@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-context";
-import { mockOpportunities, mockCertificates } from "@/lib/mock-data";
+import { useOpportunities } from "@/lib/queries/opportunities";
+import { useCertificates } from "@/lib/queries/certificates";
 import { toast } from "sonner";
 import { FileText, Download, Award, Users, CalendarCheck, CheckCircle2 } from "lucide-react";
 
@@ -19,7 +20,9 @@ function ReportsPage() {
 }
 
 function OrgReports() {
-  const orgOpps = mockOpportunities.filter(o => o.organizationId === 'org1');
+  const { user } = useAuth();
+  const orgId = user?.organization_id ?? undefined;
+  const { data: orgOpps = [] } = useOpportunities({ organizationId: orgId });
   const totalApplicants = orgOpps.reduce((sum, o) => sum + o.applicants.length, 0);
 
   const handleGenerateCert = () => {
@@ -103,6 +106,8 @@ function OrgReports() {
 }
 
 function VolunteerReports() {
+  const { user } = useAuth();
+  const { data: certificates = [] } = useCertificates(user?.id);
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <div className="mb-8">
@@ -133,7 +138,7 @@ function VolunteerReports() {
           <h2 className="text-base font-semibold flex items-center gap-2"><FileText className="size-5 text-primary" /> Certificates</h2>
         </div>
         <div className="divide-y divide-border">
-          {mockCertificates.map(cert => (
+          {certificates.map(cert => (
             <div key={cert.id} className="p-4 flex items-center justify-between">
               <div>
                 <div className="text-sm font-medium">{cert.activityTitle}</div>

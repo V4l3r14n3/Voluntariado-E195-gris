@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { mockForumMessages, type ForumMessage, mockOrganizations } from "@/lib/mock-data";
+import { useOrganizations } from "@/lib/queries/organizations";
+import { useForumMessages, useCreateForumMessage } from "@/lib/queries/forum";
 import { toast } from "sonner";
 import { MessageSquare, Send } from "lucide-react";
 
@@ -12,29 +13,34 @@ export const Route = createFileRoute("/forum")({
 function ForumPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [messages, setMessages] = useState<ForumMessage[]>(mockForumMessages);
+  const { data: organizations = [] } = useOrganizations();
+  const approvedOrgs = organizations.filter(o => o.status === 'approved');
+  const defaultOrg = user?.organization_id ?? approvedOrgs[0]?.id ?? '';
+  const [selectedOrg, setSelectedOrg] = useState(defaultOrg);
+  const currentOrg = selectedOrg || defaultOrg;
+  const { data: orgMessages = [] } = useForumMessages(currentOrg || undefined);
+  const createMut = useCreateForumMessage();
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
-  const [selectedOrg, setSelectedOrg] = useState("org1");
 
   if (!user) { navigate({ to: "/" }); return null; }
 
-  const handlePost = (e: React.FormEvent) => {
+  const handlePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !message.trim()) { toast.error("Title and message are required"); return; }
-
-    const newMsg: ForumMessage = {
-      id: 'fm-' + Date.now(), title, message,
-      authorName: user.name, authorRole: user.role,
-      organizationId: selectedOrg,
-      createdAt: new Date().toISOString(),
-    };
-    setMessages(prev => [newMsg, ...prev]);
-    setTitle(""); setMessage("");
-    toast.success("Message posted!");
+    if (!currentOrg) { toast.error("Select an organization"); return; }
+    try {
+      await createMut.mutateAsync({
+        title, message,
+        author_id: user.id, author_role: user.role,
+        organization_id: currentOrg,
+      });
+      setTitle(""); setMessage("");
+      toast.success("Message posted!");
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
   };
-
-  const orgMessages = messages.filter(m => m.organizationId === selectedOrg);
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
@@ -47,7 +53,7 @@ function ForumPage() {
         <div className="mb-6">
           <label className="text-sm font-medium mb-1 block">Select Organization</label>
           <select value={selectedOrg} onChange={e => setSelectedOrg(e.target.value)} className="w-full max-w-xs px-3 py-2 text-sm border border-input rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring">
-            {mockOrganizations.filter(o => o.status === 'approved').map(o => (
+            {approvedOrgs.map(o => (
               <option key={o.id} value={o.id}>{o.name}</option>
             ))}
           </select>

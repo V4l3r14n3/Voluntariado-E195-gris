@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { mockOpportunities, type Opportunity } from "@/lib/mock-data";
+import { useOpportunities, useCreateOpportunity, useUpdateOpportunity, useDeleteOpportunity } from "@/lib/queries/opportunities";
+import type { Opportunity } from "@/lib/mock-data";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Eye, EyeOff } from "lucide-react";
 
@@ -12,7 +13,11 @@ export const Route = createFileRoute("/opportunities")({
 function OpportunitiesPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [opportunities, setOpportunities] = useState<Opportunity[]>(mockOpportunities);
+  const orgId = user?.organization_id ?? undefined;
+  const { data: opportunities = [] } = useOpportunities({ organizationId: orgId });
+  const createMut = useCreateOpportunity();
+  const updateMut = useUpdateOpportunity();
+  const deleteMut = useDeleteOpportunity();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Opportunity | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -35,28 +40,38 @@ function OpportunitiesPage() {
     setTime(opp.time); setCity(opp.city); setLocation(opp.location); setShowForm(true);
   };
 
-  const handleSubmit = (e: React.FormEvent, publish: boolean) => {
+  const handleSubmit = async (e: React.FormEvent, publish: boolean) => {
     e.preventDefault();
     if (!title || !description || !date || !time || !city || !location) { toast.error("All fields are required"); return; }
+    if (!orgId) { toast.error("No organization linked to your user"); return; }
 
-    if (editing) {
-      setOpportunities(prev => prev.map(o => o.id === editing.id ? { ...o, title, description, date, time, city, location, published: publish } : o));
-      toast.success("Opportunity updated!");
-    } else {
-      const newOpp: Opportunity = {
-        id: 'opp-' + Date.now(), title, description, date, time, city, location,
-        organizationId: 'org1', organizationName: user.organization || user.name,
-        published: publish, applicants: []
-      };
-      setOpportunities(prev => [...prev, newOpp]);
-      toast.success(publish ? "Opportunity published!" : "Opportunity saved as draft!");
+    try {
+      if (editing) {
+        await updateMut.mutateAsync({
+          id: editing.id,
+          updates: { title, description, event_date: date, event_time: time, city, location, published: publish },
+        });
+        toast.success("Opportunity updated!");
+      } else {
+        await createMut.mutateAsync({
+          title, description, event_date: date, event_time: time, city, location,
+          organization_id: orgId, published: publish,
+        });
+        toast.success(publish ? "Opportunity published!" : "Opportunity saved as draft!");
+      }
+      resetForm();
+    } catch (err) {
+      toast.error((err as Error).message);
     }
-    resetForm();
   };
 
-  const handleDelete = (id: string) => {
-    setOpportunities(prev => prev.filter(o => o.id !== id));
-    toast.success("Opportunity deleted");
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteMut.mutateAsync(id);
+      toast.success("Opportunity deleted");
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
     setDeleteConfirm(null);
   };
 

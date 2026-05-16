@@ -1,6 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-context";
-import { mockOpportunities, mockOrganizations, mockCertificates } from "@/lib/mock-data";
+import { useOpportunities } from "@/lib/queries/opportunities";
+import { useOrganizations } from "@/lib/queries/organizations";
+import { useCertificates } from "@/lib/queries/certificates";
 import { Users, Building2, CalendarDays, CheckCircle2, Clock, AlertTriangle, TrendingUp, Award } from "lucide-react";
 import { PageTransition, StaggerContainer, StaggerItem, HoverCard } from "@/components/motion";
 
@@ -39,7 +41,11 @@ function StatCard({ icon: Icon, label, value, sub }: { icon: any; label: string;
 }
 
 function AdminDashboard() {
-  const pendingOrgs = mockOrganizations.filter(o => o.status === 'pending');
+  const { data: organizations = [] } = useOrganizations();
+  const { data: opportunities = [] } = useOpportunities();
+  const pendingOrgs = organizations.filter(o => o.status === 'pending');
+  const approvedOrgs = organizations.filter(o => o.status === 'approved');
+  const publishedOpps = opportunities.filter(o => o.published);
   return (
     <PageTransition>
       <div className="p-8 max-w-6xl mx-auto">
@@ -48,10 +54,10 @@ function AdminDashboard() {
           <p className="text-sm text-muted-foreground mt-1">System overview and management</p>
         </div>
         <StaggerContainer className="grid grid-cols-4 gap-4 mb-8">
-          <StaggerItem><StatCard icon={Building2} label="Organizations" value={mockOrganizations.length} sub={`${pendingOrgs.length} pending approval`} /></StaggerItem>
-          <StaggerItem><StatCard icon={Users} label="Total Volunteers" value="1,247" sub="+23 this week" /></StaggerItem>
-          <StaggerItem><StatCard icon={CalendarDays} label="Active Opportunities" value={mockOpportunities.filter(o => o.published).length} /></StaggerItem>
-          <StaggerItem><StatCard icon={CheckCircle2} label="Approved Orgs" value={mockOrganizations.filter(o => o.status === 'approved').length} /></StaggerItem>
+          <StaggerItem><StatCard icon={Building2} label="Organizations" value={organizations.length} sub={`${pendingOrgs.length} pending approval`} /></StaggerItem>
+          <StaggerItem><StatCard icon={Users} label="Total Volunteers" value="—" sub="See reports" /></StaggerItem>
+          <StaggerItem><StatCard icon={CalendarDays} label="Active Opportunities" value={publishedOpps.length} /></StaggerItem>
+          <StaggerItem><StatCard icon={CheckCircle2} label="Approved Orgs" value={approvedOrgs.length} /></StaggerItem>
         </StaggerContainer>
 
         <StaggerContainer className="grid grid-cols-2 gap-6">
@@ -109,7 +115,9 @@ function AdminDashboard() {
 }
 
 function OrgDashboard() {
-  const orgOpps = mockOpportunities.filter(o => o.organizationId === 'org1');
+  const { user } = useAuth();
+  const orgId = user?.organization_id ?? undefined;
+  const { data: orgOpps = [] } = useOpportunities({ organizationId: orgId });
   const totalApplicants = orgOpps.reduce((sum, o) => sum + o.applicants.length, 0);
   return (
     <PageTransition>
@@ -164,7 +172,10 @@ function OrgDashboard() {
 }
 
 function VolunteerDashboard() {
-  const appliedOpps = mockOpportunities.filter(o => o.applicants.includes('3'));
+  const { user } = useAuth();
+  const { data: opportunities = [] } = useOpportunities();
+  const { data: certificates = [] } = useCertificates(user?.id);
+  const appliedOpps = opportunities.filter(o => user && o.applicants.includes(user.id));
   return (
     <PageTransition>
       <div className="p-8 max-w-6xl mx-auto">
@@ -174,9 +185,9 @@ function VolunteerDashboard() {
         </div>
         <StaggerContainer className="grid grid-cols-4 gap-4 mb-8">
           <StaggerItem><StatCard icon={CalendarDays} label="Applied Events" value={appliedOpps.length} /></StaggerItem>
-          <StaggerItem><StatCard icon={CheckCircle2} label="Completed" value={mockCertificates.filter(c => c.status === 'completed').length} /></StaggerItem>
-          <StaggerItem><StatCard icon={Clock} label="Hours Logged" value="24" sub="This month" /></StaggerItem>
-          <StaggerItem><StatCard icon={Award} label="Certificates" value={mockCertificates.length} /></StaggerItem>
+          <StaggerItem><StatCard icon={CheckCircle2} label="Completed" value={certificates.filter(c => c.status === 'completed').length} /></StaggerItem>
+          <StaggerItem><StatCard icon={Clock} label="Hours Logged" value="—" sub="Coming soon" /></StaggerItem>
+          <StaggerItem><StatCard icon={Award} label="Certificates" value={certificates.length} /></StaggerItem>
         </StaggerContainer>
 
         <StaggerContainer className="grid grid-cols-2 gap-6">
