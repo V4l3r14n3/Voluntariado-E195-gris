@@ -56,28 +56,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(async ({ data }) => {
+    supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
       setSession(data.session);
-      if (data.session?.user) {
-        setProfileLoading(true);
-        const profile = await fetchProfile(data.session.user.id);
-        if (mounted) { setUser(profile); setProfileLoading(false); }
-      }
-      if (mounted) setLoading(false);
+      setLoading(false);
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       if (!mounted) return;
       setSession(newSession);
-      if (newSession?.user) {
-        setProfileLoading(true);
-        const profile = await fetchProfile(newSession.user.id);
-        if (mounted) { setUser(profile); setProfileLoading(false); }
-      } else {
-        setUser(null);
-        setProfileLoading(false);
-      }
     });
 
     return () => {
@@ -85,6 +72,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sub.subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) {
+      setUser(null);
+      setProfileLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setProfileLoading(true);
+    fetchProfile(userId).then((profile) => {
+      if (cancelled) return;
+      setUser(profile);
+      setProfileLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [session?.user?.id]);
 
   const authReady = !loading && !profileLoading;
 
