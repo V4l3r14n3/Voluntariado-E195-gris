@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { PageLoader } from "@/components/PageLoader";
 import { useOpportunities, useApplyToOpportunity } from "@/lib/queries/opportunities";
 import type { Opportunity } from "@/lib/mock-data";
 import { toast } from "sonner";
@@ -11,7 +12,7 @@ export const Route = createFileRoute("/search")({
 });
 
 function SearchPage() {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
   const navigate = useNavigate();
   const { data: opportunities = [], isLoading } = useOpportunities({ onlyPublished: true });
   const applyMutation = useApplyToOpportunity();
@@ -21,7 +22,12 @@ function SearchPage() {
   const [dateFilter, setDateFilter] = useState("");
   const [applyConfirm, setApplyConfirm] = useState<Opportunity | null>(null);
 
-  if (!user) { navigate({ to: "/" }); return null; }
+  useEffect(() => {
+    if (authReady && !user) navigate({ to: "/" });
+  }, [authReady, user, navigate]);
+
+  if (!authReady) return <PageLoader />;
+  if (!user) return null;
 
   const filtered = opportunities.filter(o =>
     (!titleFilter || o.title.toLowerCase().includes(titleFilter.toLowerCase())) &&

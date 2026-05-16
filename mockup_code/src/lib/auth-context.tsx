@@ -23,6 +23,7 @@ interface AuthContextType {
   user: AuthUser | null;
   session: Session | null;
   loading: boolean;
+  authReady: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
@@ -50,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -58,8 +60,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted) return;
       setSession(data.session);
       if (data.session?.user) {
+        setProfileLoading(true);
         const profile = await fetchProfile(data.session.user.id);
-        if (mounted) setUser(profile);
+        if (mounted) { setUser(profile); setProfileLoading(false); }
       }
       if (mounted) setLoading(false);
     });
@@ -68,10 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted) return;
       setSession(newSession);
       if (newSession?.user) {
+        setProfileLoading(true);
         const profile = await fetchProfile(newSession.user.id);
-        if (mounted) setUser(profile);
+        if (mounted) { setUser(profile); setProfileLoading(false); }
       } else {
         setUser(null);
+        setProfileLoading(false);
       }
     });
 
@@ -80,6 +85,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sub.subscription.unsubscribe();
     };
   }, []);
+
+  const authReady = !loading && !profileLoading;
 
   const login = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -149,6 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         session,
         loading,
+        authReady,
         isAuthenticated: !!session,
         login,
         logout,

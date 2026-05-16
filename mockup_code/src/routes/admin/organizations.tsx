@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { PageLoader } from "@/components/PageLoader";
 import { useOrganizations, useUpdateOrganization } from "@/lib/queries/organizations";
 import type { Organization } from "@/lib/mock-data";
 import { toast } from "sonner";
@@ -11,7 +12,7 @@ export const Route = createFileRoute("/admin/organizations")({
 });
 
 function AdminOrganizationsPage() {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
   const navigate = useNavigate();
   const { data: orgs = [] } = useOrganizations();
   const updateMut = useUpdateOrganization();
@@ -19,7 +20,12 @@ function AdminOrganizationsPage() {
   const [rejectionMessage, setRejectionMessage] = useState("");
   const [showRejectDialog, setShowRejectDialog] = useState(false);
 
-  if (!user || user.role !== 'admin') { navigate({ to: "/" }); return null; }
+  useEffect(() => {
+    if (authReady && (!user || user.role !== 'admin')) navigate({ to: "/" });
+  }, [authReady, user, navigate]);
+
+  if (!authReady) return <PageLoader />;
+  if (!user || user.role !== 'admin') return null;
 
   const handleApprove = async (org: Organization) => {
     try {

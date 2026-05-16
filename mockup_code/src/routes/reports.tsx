@@ -1,5 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { PageLoader } from "@/components/PageLoader";
 import { useOpportunities } from "@/lib/queries/opportunities";
 import { useCertificates } from "@/lib/queries/certificates";
 import { toast } from "sonner";
@@ -10,10 +12,15 @@ export const Route = createFileRoute("/reports")({
 });
 
 function ReportsPage() {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
   const navigate = useNavigate();
 
-  if (!user) { navigate({ to: "/" }); return null; }
+  useEffect(() => {
+    if (authReady && !user) navigate({ to: "/" });
+  }, [authReady, user, navigate]);
+
+  if (!authReady) return <PageLoader />;
+  if (!user) return null;
 
   if (user.role === 'organization') return <OrgReports />;
   return <VolunteerReports />;

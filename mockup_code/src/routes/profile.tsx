@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { PageLoader } from "@/components/PageLoader";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { UserCircle, Lock, HelpCircle } from "lucide-react";
@@ -10,7 +11,7 @@ export const Route = createFileRoute("/profile")({
 });
 
 function ProfilePage() {
-  const { user, updateProfile, logout } = useAuth();
+  const { user, authReady, updateProfile, logout } = useAuth();
   const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(user?.name ?? "");
@@ -19,7 +20,12 @@ function ProfilePage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmNew, setConfirmNew] = useState("");
 
-  if (!user) { navigate({ to: "/" }); return null; }
+  useEffect(() => {
+    if (authReady && !user) navigate({ to: "/" });
+  }, [authReady, user, navigate]);
+
+  if (!authReady) return <PageLoader />;
+  if (!user) return null;
 
   const handleSave = async () => {
     const result = await updateProfile({ name });

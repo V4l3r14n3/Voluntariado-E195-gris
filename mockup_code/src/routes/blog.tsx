@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { PageLoader } from "@/components/PageLoader";
 import { useBlogPosts, useCreateBlogPost, useUpdateBlogPost, useDeleteBlogPost } from "@/lib/queries/blog";
 import type { BlogPost } from "@/lib/mock-data";
 import { toast } from "sonner";
@@ -11,7 +12,7 @@ export const Route = createFileRoute("/blog")({
 });
 
 function BlogPage() {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
   const navigate = useNavigate();
   const { data: posts = [] } = useBlogPosts();
   const createMut = useCreateBlogPost();
@@ -24,7 +25,12 @@ function BlogPage() {
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  if (!user) { navigate({ to: "/" }); return null; }
+  useEffect(() => {
+    if (authReady && !user) navigate({ to: "/" });
+  }, [authReady, user, navigate]);
+
+  if (!authReady) return <PageLoader />;
+  if (!user) return null;
 
   const isOrg = user.role === 'organization';
   const orgId = user.organization_id;

@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { PageLoader } from "@/components/PageLoader";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { ShieldCheck, Eye, EyeOff } from "lucide-react";
@@ -11,13 +12,15 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, authReady } = useAuth();
   const navigate = useNavigate();
 
-  if (isAuthenticated) {
-    navigate({ to: "/dashboard" });
-    return null;
-  }
+  useEffect(() => {
+    if (authReady && isAuthenticated) navigate({ to: "/dashboard" });
+  }, [authReady, isAuthenticated, navigate]);
+
+  if (!authReady) return <PageLoader />;
+  if (isAuthenticated) return null;
 
   return <LoginForm />;
 }

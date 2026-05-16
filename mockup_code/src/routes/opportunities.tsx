@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { PageLoader } from "@/components/PageLoader";
 import { useOpportunities, useCreateOpportunity, useUpdateOpportunity, useDeleteOpportunity } from "@/lib/queries/opportunities";
 import type { Opportunity } from "@/lib/mock-data";
 import { toast } from "sonner";
@@ -11,7 +12,7 @@ export const Route = createFileRoute("/opportunities")({
 });
 
 function OpportunitiesPage() {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
   const navigate = useNavigate();
   const orgId = user?.organization_id ?? undefined;
   const { data: opportunities = [] } = useOpportunities({ organizationId: orgId });
@@ -28,7 +29,12 @@ function OpportunitiesPage() {
   const [city, setCity] = useState("");
   const [location, setLocation] = useState("");
 
-  if (!user || user.role !== 'organization') { navigate({ to: "/" }); return null; }
+  useEffect(() => {
+    if (authReady && (!user || user.role !== 'organization')) navigate({ to: "/" });
+  }, [authReady, user, navigate]);
+
+  if (!authReady) return <PageLoader />;
+  if (!user || user.role !== 'organization') return null;
 
   const resetForm = () => {
     setTitle(""); setDescription(""); setDate(""); setTime(""); setCity(""); setLocation("");

@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { PageLoader } from "@/components/PageLoader";
 import { useOrganizations } from "@/lib/queries/organizations";
 import { useForumMessages, useCreateForumMessage } from "@/lib/queries/forum";
 import { toast } from "sonner";
@@ -11,7 +12,7 @@ export const Route = createFileRoute("/forum")({
 });
 
 function ForumPage() {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
   const navigate = useNavigate();
   const { data: organizations = [] } = useOrganizations();
   const approvedOrgs = organizations.filter(o => o.status === 'approved');
@@ -23,7 +24,12 @@ function ForumPage() {
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
 
-  if (!user) { navigate({ to: "/" }); return null; }
+  useEffect(() => {
+    if (authReady && !user) navigate({ to: "/" });
+  }, [authReady, user, navigate]);
+
+  if (!authReady) return <PageLoader />;
+  if (!user) return null;
 
   const handlePost = async (e: React.FormEvent) => {
     e.preventDefault();

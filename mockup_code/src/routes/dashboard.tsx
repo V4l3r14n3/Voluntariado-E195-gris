@@ -1,5 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { PageLoader } from "@/components/PageLoader";
 import { useOpportunities } from "@/lib/queries/opportunities";
 import { useOrganizations } from "@/lib/queries/organizations";
 import { useCertificates } from "@/lib/queries/certificates";
@@ -11,10 +13,15 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function DashboardPage() {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
   const navigate = useNavigate();
 
-  if (!user) { navigate({ to: "/" }); return null; }
+  useEffect(() => {
+    if (authReady && !user) navigate({ to: "/" });
+  }, [authReady, user, navigate]);
+
+  if (!authReady) return <PageLoader />;
+  if (!user) return null;
 
   if (user.role === "admin") return <AdminDashboard />;
   if (user.role === "organization") return <OrgDashboard />;

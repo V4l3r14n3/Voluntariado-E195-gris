@@ -1,5 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { PageLoader } from "@/components/PageLoader";
 import { motion } from "framer-motion";
 import { StaggerContainer, StaggerItem, HoverCard, FadeIn } from "@/components/motion";
 import {
@@ -29,20 +31,21 @@ import {
   Globe,
   TreePine,
 } from "lucide-react";
-import { useState } from "react";
 
 export const Route = createFileRoute("/")({
   component: LandingPage,
 });
 
 function LandingPage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, authReady } = useAuth();
   const navigate = useNavigate();
 
-  if (isAuthenticated) {
-    navigate({ to: "/dashboard" });
-    return null;
-  }
+  useEffect(() => {
+    if (authReady && isAuthenticated) navigate({ to: "/dashboard" });
+  }, [authReady, isAuthenticated, navigate]);
+
+  if (!authReady) return <PageLoader />;
+  if (isAuthenticated) return null;
 
   return (
     <div className="min-h-screen bg-background">
