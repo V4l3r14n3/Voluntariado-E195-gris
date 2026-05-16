@@ -110,17 +110,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       : null;
 
     if (payload.role === 'organization' && !organizationId && payload.organizationName) {
-      const { data: orgRow, error: orgErr } = await supabase
+      // Client-side UUID — anon RLS allows INSERT pending but not SELECT pending, so we cannot use .select() return.
+      const newOrgId = crypto.randomUUID();
+      const { error: orgErr } = await supabase
         .from('organizations')
         .insert({
+          id: newOrgId,
           name: payload.organizationName,
           email: payload.email,
           status: 'pending',
-        })
-        .select('id')
-        .single();
+        });
       if (orgErr) return { ok: false, error: `Org creation failed: ${orgErr.message}` };
-      organizationId = orgRow.id;
+      organizationId = newOrgId;
     }
 
     const { data, error } = await supabase.auth.signUp({
