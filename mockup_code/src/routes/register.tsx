@@ -35,7 +35,10 @@ function RegisterPage() {
     if (password !== confirmPassword) errs.confirmPassword = "Passwords don't match";
     if (!securityQuestion) errs.securityQuestion = "Required";
     if (!securityAnswer) errs.securityAnswer = "Required";
-    if (role === "organization" && !selectedOrg && !newOrgName) errs.organization = "Select or create an organization";
+    if (role === "organization") {
+      if (!selectedOrg) errs.organization = "Select or create an organization";
+      else if (selectedOrg === "new" && !newOrgName.trim()) errs.organization = "Enter organization name";
+    }
     return errs;
   };
 
@@ -51,8 +54,8 @@ function RegisterPage() {
       password,
       role,
       securityQuestion,
-      existingOrganizationId: role === "organization" && selectedOrg !== "new" ? selectedOrg : undefined,
-      organizationName: role === "organization" && selectedOrg === "new" ? newOrgName : undefined,
+      existingOrganizationId: role === "organization" && selectedOrg && selectedOrg !== "new" ? selectedOrg : undefined,
+      organizationName: role === "organization" && selectedOrg === "new" ? newOrgName.trim() : undefined,
     });
     setSubmitting(false);
 

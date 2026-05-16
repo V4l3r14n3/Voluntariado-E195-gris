@@ -105,7 +105,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (payload: RegisterPayload) => {
-    let organizationId = payload.existingOrganizationId ?? null;
+    let organizationId: string | null = payload.existingOrganizationId && payload.existingOrganizationId.trim() !== ''
+      ? payload.existingOrganizationId
+      : null;
 
     if (payload.role === 'organization' && !organizationId && payload.organizationName) {
       const { data: orgRow, error: orgErr } = await supabase
