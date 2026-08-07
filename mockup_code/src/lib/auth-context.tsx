@@ -1,52 +1,177 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
-import type { User, UserRole } from './mock-data';
-import { mockUsers } from './mock-data';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { supabase } from './supabase';
+import type { Tables } from './supabase';
+import type { Session } from '@supabase/supabase-js';
+
+export type UserRole = 'admin' | 'organization' | 'volunteer';
+
+export type AuthUser = Tables<'users'> & {
+  organization?: Tables<'organizations'> | null;
+};
+
+interface RegisterPayload {
+  name: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  securityQuestion?: string;
+  organizationName?: string;
+  existingOrganizationId?: string;
+}
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
+  session: Session | null;
+  loading: boolean;
+  authReady: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => boolean;
-  logout: () => void;
-  register: (name: string, email: string, role: UserRole, org?: string) => void;
-  updateProfile: (updates: Partial<User>) => void;
+  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  logout: () => Promise<void>;
+  register: (payload: RegisterPayload) => Promise<{ ok: boolean; error?: string; needsConfirmation?: boolean }>;
+  updateProfile: (updates: Partial<Pick<AuthUser, 'name' | 'avatar_url' | 'security_question'>>) => Promise<{ ok: boolean; error?: string }>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+async function fetchProfile(userId: string): Promise<AuthUser | null> {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*, organization:organizations(*)')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) {
+    console.error('fetchProfile error', error);
+    return null;
+  }
+  return data as AuthUser | null;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
 
-  const login = (email: string, _password: string): boolean => {
-    const found = mockUsers.find(u => u.email === email);
-    if (found) {
-      setUser(found);
-      return true;
+  useEffect(() => {
+    let mounted = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setSession(data.session);
+      setLoading(false);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (!mounted) return;
+      setSession(newSession);
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) {
+      setUser(null);
+      setProfileLoading(false);
+      return;
     }
-    // For demo: accept any email and guess role from email
-    if (email.includes('admin')) {
-      setUser({ id: 'demo', name: 'Demo Admin', email, role: 'admin' });
-      return true;
-    }
-    if (email.includes('org')) {
-      setUser({ id: 'demo', name: 'Demo Organization', email, role: 'organization', organization: 'Demo Org' });
-      return true;
-    }
-    setUser({ id: 'demo', name: 'Demo Volunteer', email, role: 'volunteer' });
-    return true;
+    let cancelled = false;
+    setProfileLoading(true);
+    fetchProfile(userId).then((profile) => {
+      if (cancelled) return;
+      setUser(profile);
+      setProfileLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [session?.user?.id]);
+
+  const authReady = !loading && !profileLoading;
+
+  const login = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
   };
 
-  const logout = () => setUser(null);
-
-  const register = (name: string, email: string, role: UserRole, org?: string) => {
-    setUser({ id: 'new-' + Date.now(), name, email, role, organization: org });
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
   };
 
-  const updateProfile = (updates: Partial<User>) => {
-    if (user) setUser({ ...user, ...updates });
+  const register = async (payload: RegisterPayload) => {
+    let organizationId: string | null = payload.existingOrganizationId && payload.existingOrganizationId.trim() !== ''
+      ? payload.existingOrganizationId
+      : null;
+
+    if (payload.role === 'organization' && !organizationId && payload.organizationName) {
+      // Client-side UUID — anon RLS allows INSERT pending but not SELECT pending, so we cannot use .select() return.
+      const newOrgId = crypto.randomUUID();
+      const { error: orgErr } = await supabase
+        .from('organizations')
+        .insert({
+          id: newOrgId,
+          name: payload.organizationName,
+          email: payload.email,
+          status: 'pending',
+        });
+      if (orgErr) return { ok: false, error: `Org creation failed: ${orgErr.message}` };
+      organizationId = newOrgId;
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+      email: payload.email,
+      password: payload.password,
+      options: {
+        data: {
+          name: payload.name,
+          role: payload.role,
+          organization_id: organizationId ?? '',
+          security_question: payload.securityQuestion ?? '',
+        },
+      },
+    });
+    if (error) return { ok: false, error: error.message };
+
+    const needsConfirmation = !data.session;
+    return { ok: true, needsConfirmation };
+  };
+
+  const updateProfile = async (updates: Partial<Pick<AuthUser, 'name' | 'avatar_url' | 'security_question'>>) => {
+    if (!user) return { ok: false, error: 'Not authenticated' };
+    const { error } = await supabase.from('users').update(updates).eq('id', user.id);
+    if (error) return { ok: false, error: error.message };
+    const fresh = await fetchProfile(user.id);
+    setUser(fresh);
+    return { ok: true };
+  };
+
+  const refreshProfile = async () => {
+    if (!session?.user) return;
+    const fresh = await fetchProfile(session.user.id);
+    setUser(fresh);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout, register, updateProfile }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        loading,
+        authReady,
+        isAuthenticated: !!session,
+        login,
+        logout,
+        register,
+        updateProfile,
+        refreshProfile,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

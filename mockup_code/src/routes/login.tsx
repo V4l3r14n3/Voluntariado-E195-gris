@@ -1,22 +1,27 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { PageLoader } from "@/components/PageLoader";
+import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
 function LoginPage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, authReady } = useAuth();
   const navigate = useNavigate();
 
-  if (isAuthenticated) {
-    navigate({ to: "/dashboard" });
-    return null;
-  }
+  useEffect(() => {
+    if (authReady && isAuthenticated) navigate({ to: "/dashboard" });
+  }, [authReady, isAuthenticated, navigate]);
+
+  if (!authReady) return <PageLoader />;
+  if (isAuthenticated) return null;
 
   return <LoginForm />;
 }
@@ -24,46 +29,51 @@ function LoginPage() {
 function LoginForm() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation(['auth', 'common']);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
-  const [securityAnswer, setSecurityAnswer] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
-    if (!email) errs.email = "Email is required";
-    if (!password) errs.password = "Password is required";
-    if (password && password.length < 6) errs.password = "Password must be at least 6 characters";
+    if (!email) errs.email = t('auth:register.validation.loginEmailRequired');
+    if (!password) errs.password = t('auth:register.validation.loginPasswordRequired');
+    if (password && password.length < 6) errs.password = t('auth:register.validation.loginPasswordMin');
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
-    const success = login(email, password);
-    if (success) {
-      toast.success("Login successful!");
+    setSubmitting(true);
+    const result = await login(email, password);
+    setSubmitting(false);
+    if (result.ok) {
+      toast.success(t('auth:login.success'));
       navigate({ to: "/dashboard" });
     } else {
-      toast.error("Invalid credentials");
+      toast.error(result.error ?? t('auth:login.invalidCredentials'));
     }
   };
 
-  const handleForgotPassword = (e: React.FormEvent) => {
+  const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotEmail || !securityAnswer) {
-      toast.error("Please fill in all fields");
+    if (!forgotEmail) {
+      toast.error(t('auth:forgot.emailRequired'));
       return;
     }
-    toast.success("Password reset link sent to your email!");
-    setShowForgot(false);
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+      redirectTo: `${window.location.origin}/login`,
+    });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success(t('auth:forgot.success'));
+      setShowForgot(false);
+    }
   };
-
-  const demoAccounts = [
-    { role: "Admin", email: "admin@vms.org" },
-    { role: "Org", email: "org@greenearth.org" },
-    { role: "Volunteer", email: "jane@email.com" },
-  ];
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -81,9 +91,9 @@ function LoginForm() {
             transition={{ delay: 0.1, duration: 0.4 }}
           >
             <ShieldCheck className="size-8 text-primary" />
-            <span className="text-2xl font-bold tracking-tight">Volunteero</span>
+            <span className="text-2xl font-bold tracking-tight">{t('common:brand')}</span>
           </motion.div>
-          <p className="text-sm text-muted-foreground">Volunteer Management System</p>
+          <p className="text-sm text-muted-foreground">{t('auth:subtitle')}</p>
         </div>
 
         {!showForgot ? (
@@ -95,12 +105,12 @@ function LoginForm() {
             transition={{ duration: 0.3 }}
             className="bg-card border border-border rounded-sm p-6 shadow-sm"
           >
-            <h2 className="text-lg font-semibold mb-1">Sign In</h2>
-            <p className="text-sm text-muted-foreground mb-6">Enter your credentials to continue</p>
+            <h2 className="text-lg font-semibold mb-1">{t('auth:login.heading')}</h2>
+            <p className="text-sm text-muted-foreground mb-6">{t('auth:login.sub')}</p>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div>
-                <label className="text-sm font-medium mb-1 block">Email</label>
+                <label className="text-sm font-medium mb-1 block">{t('auth:login.email')}</label>
                 <input
                   type="email"
                   value={email}
@@ -112,7 +122,7 @@ function LoginForm() {
               </div>
 
               <div>
-                <label className="text-sm font-medium mb-1 block">Password</label>
+                <label className="text-sm font-medium mb-1 block">{t('auth:login.password')}</label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
@@ -130,31 +140,22 @@ function LoginForm() {
 
               <motion.button
                 type="submit"
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.98 }}
-                className="w-full py-2 bg-primary text-primary-foreground text-sm font-medium rounded-sm hover:bg-primary/90 transition-colors"
+                disabled={submitting}
+                whileHover={{ scale: submitting ? 1 : 1.01 }}
+                whileTap={{ scale: submitting ? 1 : 0.98 }}
+                className="w-full py-2 bg-primary text-primary-foreground text-sm font-medium rounded-sm hover:bg-primary/90 transition-colors disabled:opacity-60"
               >
-                Sign In
+                {submitting ? t('auth:login.submitting') : t('auth:login.submit')}
               </motion.button>
             </form>
 
             <button onClick={() => setShowForgot(true)} className="text-sm text-primary hover:underline mt-4 block text-center w-full">
-              Forgot password?
+              {t('auth:login.forgot')}
             </button>
 
-            <div className="mt-6 pt-4 border-t border-border text-center text-sm text-muted-foreground">
-              <p className="mb-2">Demo accounts:</p>
-              <div className="flex flex-col gap-1 text-xs">
-                {demoAccounts.map(acc => (
-                  <span key={acc.role}><strong>{acc.role}:</strong>{` ${acc.email}`}</span>
-                ))}
-              </div>
-              <p className="text-xs mt-2 text-muted-foreground">Any password works for demo</p>
-            </div>
-
             <div className="mt-4 text-center">
-              <span className="text-sm text-muted-foreground">Don't have an account? </span>
-              <Link to="/register" className="text-sm text-primary font-medium hover:underline">Register</Link>
+              <span className="text-sm text-muted-foreground">{t('auth:login.noAccount')} </span>
+              <Link to="/register" className="text-sm text-primary font-medium hover:underline">{t('auth:login.registerLink')}</Link>
             </div>
           </motion.div>
         ) : (
@@ -166,17 +167,13 @@ function LoginForm() {
             transition={{ duration: 0.3 }}
             className="bg-card border border-border rounded-sm p-6 shadow-sm"
           >
-            <h2 className="text-lg font-semibold mb-1">Reset Password</h2>
-            <p className="text-sm text-muted-foreground mb-6">Answer your security question</p>
+            <h2 className="text-lg font-semibold mb-1">{t('auth:forgot.heading')}</h2>
+            <p className="text-sm text-muted-foreground mb-6">{t('auth:forgot.sub')}</p>
 
             <form onSubmit={handleForgotPassword} className="flex flex-col gap-4">
               <div>
-                <label className="text-sm font-medium mb-1 block">Email</label>
+                <label className="text-sm font-medium mb-1 block">{t('auth:login.email')}</label>
                 <input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} className="w-full px-3 py-2 text-sm border border-input rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="you@example.com" />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Security Question Answer</label>
-                <input type="text" value={securityAnswer} onChange={e => setSecurityAnswer(e.target.value)} className="w-full px-3 py-2 text-sm border border-input rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Your answer" />
               </div>
               <motion.button
                 type="submit"
@@ -184,11 +181,11 @@ function LoginForm() {
                 whileTap={{ scale: 0.98 }}
                 className="w-full py-2 bg-primary text-primary-foreground text-sm font-medium rounded-sm hover:bg-primary/90 transition-colors"
               >
-                Reset Password
+                {t('auth:forgot.send')}
               </motion.button>
             </form>
             <button onClick={() => setShowForgot(false)} className="text-sm text-primary hover:underline mt-4 block text-center w-full">
-              Back to login
+              {t('auth:forgot.back')}
             </button>
           </motion.div>
         )}

@@ -1,6 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { PageLoader } from "@/components/PageLoader";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { StaggerContainer, StaggerItem, HoverCard, FadeIn } from "@/components/motion";
 import {
   ShieldCheck,
@@ -29,20 +32,21 @@ import {
   Globe,
   TreePine,
 } from "lucide-react";
-import { useState } from "react";
 
 export const Route = createFileRoute("/")({
   component: LandingPage,
 });
 
 function LandingPage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, authReady } = useAuth();
   const navigate = useNavigate();
 
-  if (isAuthenticated) {
-    navigate({ to: "/dashboard" });
-    return null;
-  }
+  useEffect(() => {
+    if (authReady && isAuthenticated) navigate({ to: "/dashboard" });
+  }, [authReady, isAuthenticated, navigate]);
+
+  if (!authReady) return <PageLoader />;
+  if (isAuthenticated) return null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -60,13 +64,14 @@ function LandingPage() {
 
 /* ─── Navbar ─── */
 function Navbar() {
+  const { t } = useTranslation(['landing', 'common']);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navLinks = [
-    { label: "Home", href: "/" },
-    { label: "Opportunities", href: "/search" },
-    { label: "Community", href: "/forum" },
-    { label: "Blog", href: "/blog" },
+    { label: t('landing:nav.home'), href: "/" },
+    { label: t('landing:nav.opportunities'), href: "/search" },
+    { label: t('landing:nav.community'), href: "/forum" },
+    { label: t('landing:nav.blog'), href: "/blog" },
   ];
 
   return (
@@ -78,13 +83,11 @@ function Navbar() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
             <ShieldCheck className="size-7 text-primary" />
-            <span className="text-xl font-bold tracking-tight text-foreground">Volunteero</span>
+            <span className="text-xl font-bold tracking-tight text-foreground">{t('common:brand')}</span>
           </Link>
 
-          {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-1">
             {navLinks.map(link => (
               <Link
@@ -97,7 +100,6 @@ function Navbar() {
             ))}
           </nav>
 
-          {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-3">
             <Link to="/login">
               <motion.button
@@ -105,7 +107,7 @@ function Navbar() {
                 whileTap={{ scale: 0.98 }}
                 className="px-4 py-2 text-sm font-medium text-foreground border border-border rounded-md hover:bg-accent transition-colors"
               >
-                Login
+                {t('landing:nav.login')}
               </motion.button>
             </Link>
             <Link to="/register">
@@ -114,12 +116,11 @@ function Navbar() {
                 whileTap={{ scale: 0.98 }}
                 className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
               >
-                Sign Up
+                {t('landing:nav.signUp')}
               </motion.button>
             </Link>
           </div>
 
-          {/* Mobile Toggle */}
           <button
             className="md:hidden p-2 text-foreground"
             onClick={() => setMobileOpen(!mobileOpen)}
@@ -128,7 +129,6 @@ function Navbar() {
           </button>
         </div>
 
-        {/* Mobile Menu */}
         {mobileOpen && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
@@ -150,12 +150,12 @@ function Navbar() {
               <div className="flex gap-2 mt-2 px-3">
                 <Link to="/login" className="flex-1">
                   <button className="w-full px-4 py-2 text-sm font-medium text-foreground border border-border rounded-md hover:bg-accent">
-                    Login
+                    {t('landing:nav.login')}
                   </button>
                 </Link>
                 <Link to="/register" className="flex-1">
                   <button className="w-full px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
-                    Sign Up
+                    {t('landing:nav.signUp')}
                   </button>
                 </Link>
               </div>
@@ -169,9 +169,9 @@ function Navbar() {
 
 /* ─── Hero ─── */
 function HeroSection() {
+  const { t } = useTranslation('landing');
   return (
     <section className="relative overflow-hidden">
-      {/* Background decoration */}
       <div className="absolute inset-0 -z-10">
         <div className="absolute top-20 left-10 w-72 h-72 bg-primary/5 rounded-full blur-3xl" />
         <div className="absolute bottom-10 right-10 w-96 h-96 bg-accent/30 rounded-full blur-3xl" />
@@ -179,7 +179,6 @@ function HeroSection() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-32">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Text */}
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
@@ -192,18 +191,17 @@ function HeroSection() {
               className="inline-flex items-center gap-2 px-3 py-1 mb-6 text-xs font-medium bg-primary/10 text-primary rounded-full border border-primary/20"
             >
               <Leaf className="size-3" />
-              Making a difference, together
+              {t('hero.badge')}
             </motion.div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-tight">
-              Volunteer for a{" "}
-              <span className="text-primary">Better</span>{" "}
-              Tomorrow
+              {t('hero.titlePre')}{" "}
+              <span className="text-primary">{t('hero.titleHighlight')}</span>{" "}
+              {t('hero.titlePost')}
             </h1>
 
             <p className="mt-6 text-lg text-muted-foreground max-w-lg leading-relaxed">
-              Discover meaningful volunteer opportunities, connect with organizations,
-              and track your impact — all in one platform designed to make giving back effortless.
+              {t('hero.description')}
             </p>
 
             <div className="flex flex-wrap gap-4 mt-8">
@@ -213,7 +211,7 @@ function HeroSection() {
                   whileTap={{ scale: 0.97 }}
                   className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground font-medium rounded-md hover:bg-primary/90 transition-colors shadow-sm"
                 >
-                  Explore Opportunities
+                  {t('hero.explore')}
                   <Compass className="size-4" />
                 </motion.button>
               </Link>
@@ -223,18 +221,17 @@ function HeroSection() {
                   whileTap={{ scale: 0.97 }}
                   className="inline-flex items-center gap-2 px-6 py-3 border border-border text-foreground font-medium rounded-md hover:bg-accent transition-colors"
                 >
-                  Get Started
+                  {t('hero.getStarted')}
                   <ArrowRight className="size-4" />
                 </motion.button>
               </Link>
             </div>
 
-            {/* Stats */}
             <div className="flex gap-8 mt-12">
               {[
-                { value: "2,500+", label: "Volunteers" },
-                { value: "180+", label: "Organizations" },
-                { value: "850+", label: "Opportunities" },
+                { value: "2,500+", label: t('hero.stats.volunteers') },
+                { value: "180+", label: t('hero.stats.organizations') },
+                { value: "850+", label: t('hero.stats.opportunities') },
               ].map((stat, i) => (
                 <motion.div
                   key={stat.label}
@@ -249,7 +246,6 @@ function HeroSection() {
             </div>
           </motion.div>
 
-          {/* Hero Illustration */}
           <motion.div
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
@@ -257,7 +253,6 @@ function HeroSection() {
             className="hidden lg:block"
           >
             <div className="relative">
-              {/* Main card */}
               <motion.div
                 animate={{ y: [0, -8, 0] }}
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
@@ -268,15 +263,15 @@ function HeroSection() {
                     <Globe className="size-5 text-primary" />
                   </div>
                   <div>
-                    <div className="font-semibold text-foreground">Active Campaigns</div>
-                    <div className="text-sm text-muted-foreground">Join today</div>
+                    <div className="font-semibold text-foreground">{t('hero.card.title')}</div>
+                    <div className="text-sm text-muted-foreground">{t('hero.card.sub')}</div>
                   </div>
                 </div>
                 <div className="space-y-3">
                   {[
-                    { title: "Beach Cleanup Drive", location: "Santa Monica", color: "bg-primary/10 text-primary" },
-                    { title: "Tree Planting Weekend", location: "Portland", color: "bg-success/10 text-success" },
-                    { title: "Community Garden", location: "Austin", color: "bg-warning/10 text-warning" },
+                    { title: t('opportunities.items.beach.title'), location: "Santa Marta" },
+                    { title: t('opportunities.items.trees.title'), location: "Medellín" },
+                    { title: t('opportunities.items.garden.title'), location: "Bogotá" },
                   ].map((item, i) => (
                     <motion.div
                       key={item.title}
@@ -285,7 +280,7 @@ function HeroSection() {
                       transition={{ delay: 0.6 + i * 0.15 }}
                       className="flex items-center gap-3 p-3 rounded-lg bg-muted/50"
                     >
-                      <div className={`w-2 h-2 rounded-full ${item.color.split(" ")[0].replace("/10", "")}`} style={{ backgroundColor: "var(--primary)" }} />
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "var(--primary)" }} />
                       <div className="flex-1">
                         <div className="text-sm font-medium text-foreground">{item.title}</div>
                         <div className="text-xs text-muted-foreground flex items-center gap-1">
@@ -298,7 +293,6 @@ function HeroSection() {
                 </div>
               </motion.div>
 
-              {/* Floating badge */}
               <motion.div
                 animate={{ y: [0, 6, 0] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 1 }}
@@ -306,11 +300,10 @@ function HeroSection() {
               >
                 <div className="flex items-center gap-2">
                   <Heart className="size-4" />
-                  12 new this week
+                  {t('hero.newThisWeek', { count: 12 })}
                 </div>
               </motion.div>
 
-              {/* Floating avatar group */}
               <motion.div
                 animate={{ y: [0, -6, 0] }}
                 transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
@@ -321,7 +314,7 @@ function HeroSection() {
                     <div key={i} className={`w-7 h-7 rounded-full ${bg} border-2 border-card`} />
                   ))}
                 </div>
-                <div className="text-xs text-muted-foreground">+48 joined today</div>
+                <div className="text-xs text-muted-foreground">{t('hero.joinedToday', { count: 48 })}</div>
               </motion.div>
             </div>
           </motion.div>
@@ -333,27 +326,12 @@ function HeroSection() {
 
 /* ─── Features ─── */
 function FeaturesSection() {
+  const { t } = useTranslation('landing');
   const features = [
-    {
-      icon: Search,
-      title: "Find Volunteer Opportunities",
-      description: "Browse and filter hundreds of opportunities by location, date, category, and organization to find the perfect match.",
-    },
-    {
-      icon: Users,
-      title: "Join Community Discussions",
-      description: "Connect with fellow volunteers and organizations through forums, share experiences, and build lasting relationships.",
-    },
-    {
-      icon: Clock,
-      title: "Track Volunteer Hours",
-      description: "Automatically log your volunteer hours, earn certificates, and build a verified record of your community impact.",
-    },
-    {
-      icon: Heart,
-      title: "Make Social Impact",
-      description: "See the tangible difference you're making with impact reports, badges, and recognition from the organizations you support.",
-    },
+    { icon: Search, title: t('features.items.find.title'), description: t('features.items.find.desc') },
+    { icon: Users, title: t('features.items.community.title'), description: t('features.items.community.desc') },
+    { icon: Clock, title: t('features.items.hours.title'), description: t('features.items.hours.desc') },
+    { icon: Heart, title: t('features.items.impact.title'), description: t('features.items.impact.desc') },
   ];
 
   return (
@@ -362,13 +340,13 @@ function FeaturesSection() {
         <FadeIn>
           <div className="text-center max-w-2xl mx-auto mb-16">
             <div className="inline-flex items-center gap-2 px-3 py-1 mb-4 text-xs font-medium bg-primary/10 text-primary rounded-full border border-primary/20">
-              Platform Features
+              {t('features.badge')}
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
-              Everything You Need to Make a Difference
+              {t('features.title')}
             </h2>
             <p className="mt-4 text-muted-foreground text-lg">
-              Our platform provides all the tools volunteers and organizations need to create meaningful change.
+              {t('features.sub')}
             </p>
           </div>
         </FadeIn>
@@ -395,30 +373,34 @@ function FeaturesSection() {
 
 /* ─── Featured Opportunities ─── */
 function OpportunitiesSection() {
+  const { t, i18n } = useTranslation('landing');
+  const locale = (i18n.resolvedLanguage || 'es').slice(0, 2) === 'es' ? 'es-CO' : 'en-US';
+  const fmt = (d: string) => new Date(d).toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' });
+
   const opportunities = [
     {
-      title: "Beach Cleanup Drive",
-      location: "Santa Monica, CA",
-      category: "Environment",
-      description: "Help us clean the coastline and protect marine life. Gloves and bags provided for all participants.",
+      title: t('opportunities.items.beach.title'),
+      location: "Santa Marta, Magdalena",
+      category: t('opportunities.categories.environment'),
+      description: t('opportunities.items.beach.desc'),
       icon: Globe,
-      date: "May 15, 2024",
+      date: fmt("2026-05-15"),
     },
     {
-      title: "Tree Planting Weekend",
-      location: "Portland, OR",
-      category: "Conservation",
-      description: "Join our initiative to plant 500 trees in the local park. No experience needed — just bring your energy!",
+      title: t('opportunities.items.trees.title'),
+      location: "Medellín, Antioquia",
+      category: t('opportunities.categories.conservation'),
+      description: t('opportunities.items.trees.desc'),
       icon: TreePine,
-      date: "Jun 1, 2024",
+      date: fmt("2026-06-01"),
     },
     {
-      title: "Community Garden Setup",
-      location: "Austin, TX",
-      category: "Community",
-      description: "Help set up raised beds and irrigation for the new community garden at East Austin Community Center.",
+      title: t('opportunities.items.garden.title'),
+      location: "Bogotá, Cundinamarca",
+      category: t('opportunities.categories.community'),
+      description: t('opportunities.items.garden.desc'),
       icon: Leaf,
-      date: "May 20, 2024",
+      date: fmt("2026-05-20"),
     },
   ];
 
@@ -428,13 +410,13 @@ function OpportunitiesSection() {
         <FadeIn>
           <div className="text-center max-w-2xl mx-auto mb-16">
             <div className="inline-flex items-center gap-2 px-3 py-1 mb-4 text-xs font-medium bg-primary/10 text-primary rounded-full border border-primary/20">
-              Featured
+              {t('opportunities.badge')}
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
-              Volunteer Opportunities Near You
+              {t('opportunities.title')}
             </h2>
             <p className="mt-4 text-muted-foreground text-lg">
-              Browse our latest featured opportunities and start making a difference today.
+              {t('opportunities.sub')}
             </p>
           </div>
         </FadeIn>
@@ -444,7 +426,6 @@ function OpportunitiesSection() {
             <StaggerItem key={opp.title}>
               <HoverCard className="h-full">
                 <div className="bg-card border border-border rounded-xl overflow-hidden h-full flex flex-col">
-                  {/* Card top accent */}
                   <div className="h-1.5 bg-primary" />
                   <div className="p-6 flex flex-col flex-1">
                     <div className="flex items-start justify-between mb-4">
@@ -469,7 +450,7 @@ function OpportunitiesSection() {
                           whileHover={{ x: 4 }}
                           className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
                         >
-                          View Details
+                          {t('opportunities.viewDetails')}
                           <ArrowRight className="size-3.5" />
                         </motion.button>
                       </Link>
@@ -489,7 +470,7 @@ function OpportunitiesSection() {
                 whileTap={{ scale: 0.97 }}
                 className="inline-flex items-center gap-2 px-6 py-3 border border-border text-foreground font-medium rounded-md hover:bg-accent transition-colors"
               >
-                View All Opportunities
+                {t('opportunities.viewAll')}
                 <ArrowRight className="size-4" />
               </motion.button>
             </Link>
@@ -502,25 +483,11 @@ function OpportunitiesSection() {
 
 /* ─── How It Works ─── */
 function HowItWorksSection() {
+  const { t } = useTranslation('landing');
   const steps = [
-    {
-      icon: UserPlus,
-      title: "Create Account",
-      description: "Sign up as a volunteer or an organization in under a minute — no complicated forms.",
-      step: "01",
-    },
-    {
-      icon: Compass,
-      title: "Find Opportunities",
-      description: "Browse, search, and filter volunteer opportunities by location, date, and cause.",
-      step: "02",
-    },
-    {
-      icon: HandHeart,
-      title: "Start Volunteering",
-      description: "Apply, get confirmed, and show up to make a real impact in your community.",
-      step: "03",
-    },
+    { icon: UserPlus, title: t('how.steps.create.title'), description: t('how.steps.create.desc'), step: "01" },
+    { icon: Compass, title: t('how.steps.find.title'), description: t('how.steps.find.desc'), step: "02" },
+    { icon: HandHeart, title: t('how.steps.start.title'), description: t('how.steps.start.desc'), step: "03" },
   ];
 
   return (
@@ -529,13 +496,13 @@ function HowItWorksSection() {
         <FadeIn>
           <div className="text-center max-w-2xl mx-auto mb-16">
             <div className="inline-flex items-center gap-2 px-3 py-1 mb-4 text-xs font-medium bg-primary/10 text-primary rounded-full border border-primary/20">
-              How It Works
+              {t('how.badge')}
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
-              Get Started in 3 Simple Steps
+              {t('how.title')}
             </h2>
             <p className="mt-4 text-muted-foreground text-lg">
-              From sign-up to making an impact — it only takes a few minutes.
+              {t('how.sub')}
             </p>
           </div>
         </FadeIn>
@@ -544,18 +511,14 @@ function HowItWorksSection() {
           {steps.map((step, i) => (
             <StaggerItem key={step.title}>
               <div className="relative text-center">
-                {/* Connector line */}
                 {i < steps.length - 1 && (
                   <div className="hidden md:block absolute top-14 left-[60%] w-[80%] h-px border-t-2 border-dashed border-border" />
                 )}
-                <motion.div
-                  whileHover={{ y: -4 }}
-                  className="relative z-10"
-                >
+                <motion.div whileHover={{ y: -4 }} className="relative z-10">
                   <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center mb-4">
                     <step.icon className="size-7 text-primary" />
                   </div>
-                  <div className="text-xs font-bold text-primary mb-2">STEP {step.step}</div>
+                  <div className="text-xs font-bold text-primary mb-2">{t('how.step')} {step.step}</div>
                   <h3 className="text-xl font-semibold text-foreground mb-2">{step.title}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">{step.description}</p>
                 </motion.div>
@@ -570,25 +533,11 @@ function HowItWorksSection() {
 
 /* ─── Testimonials ─── */
 function TestimonialsSection() {
+  const { t } = useTranslation('landing');
   const testimonials = [
-    {
-      name: "Sarah Mitchell",
-      role: "Volunteer",
-      review: "Volunteero made it incredibly easy to find meaningful opportunities near me. I've logged over 200 hours and earned certificates that helped my college applications!",
-      rating: 5,
-    },
-    {
-      name: "Mark Chen",
-      role: "Organization Admin",
-      review: "As an organization, managing volunteers used to be a headache. Volunteero streamlined our entire process — from posting opportunities to tracking attendance.",
-      rating: 5,
-    },
-    {
-      name: "Elena Rodriguez",
-      role: "Volunteer",
-      review: "The community forum is amazing! I've connected with so many like-minded people and discovered causes I'm truly passionate about. Highly recommended.",
-      rating: 5,
-    },
+    { name: "Sara Mitchell", role: t('testimonials.items.sarah.role'), review: t('testimonials.items.sarah.review'), rating: 5 },
+    { name: "Marco Chen", role: t('testimonials.items.mark.role'), review: t('testimonials.items.mark.review'), rating: 5 },
+    { name: "Elena Rodríguez", role: t('testimonials.items.elena.role'), review: t('testimonials.items.elena.review'), rating: 5 },
   ];
 
   return (
@@ -597,38 +546,38 @@ function TestimonialsSection() {
         <FadeIn>
           <div className="text-center max-w-2xl mx-auto mb-16">
             <div className="inline-flex items-center gap-2 px-3 py-1 mb-4 text-xs font-medium bg-primary/10 text-primary rounded-full border border-primary/20">
-              Testimonials
+              {t('testimonials.badge')}
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
-              What Our Community Says
+              {t('testimonials.title')}
             </h2>
             <p className="mt-4 text-muted-foreground text-lg">
-              Hear from volunteers and organizers who use Volunteero every day.
+              {t('testimonials.sub')}
             </p>
           </div>
         </FadeIn>
 
         <StaggerContainer className="grid md:grid-cols-3 gap-6">
-          {testimonials.map(t => (
-            <StaggerItem key={t.name}>
+          {testimonials.map(tm => (
+            <StaggerItem key={tm.name}>
               <HoverCard className="h-full">
                 <div className="bg-card border border-border rounded-xl p-6 h-full flex flex-col">
                   <Quote className="size-8 text-primary/20 mb-4" />
                   <p className="text-sm text-muted-foreground leading-relaxed flex-1 mb-6">
-                    "{t.review}"
+                    "{tm.review}"
                   </p>
                   <div className="flex items-center gap-1 mb-4">
-                    {Array.from({ length: t.rating }).map((_, i) => (
+                    {Array.from({ length: tm.rating }).map((_, i) => (
                       <Star key={i} className="size-4 text-warning fill-warning" />
                     ))}
                   </div>
                   <div className="flex items-center gap-3 pt-4 border-t border-border">
                     <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
-                      {t.name.charAt(0)}
+                      {tm.name.charAt(0)}
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-foreground">{t.name}</div>
-                      <div className="text-xs text-muted-foreground">{t.role}</div>
+                      <div className="text-sm font-semibold text-foreground">{tm.name}</div>
+                      <div className="text-xs text-muted-foreground">{tm.role}</div>
                     </div>
                   </div>
                 </div>
@@ -643,15 +592,16 @@ function TestimonialsSection() {
 
 /* ─── CTA ─── */
 function CTASection() {
+  const { t } = useTranslation('landing');
   return (
     <section className="py-20 lg:py-28 bg-primary">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <FadeIn>
           <h2 className="text-3xl sm:text-4xl font-bold text-primary-foreground tracking-tight">
-            Ready to Make a Difference?
+            {t('cta.title')}
           </h2>
           <p className="mt-4 text-lg text-primary-foreground/80 max-w-2xl mx-auto">
-            Join thousands of volunteers and organizations building stronger communities. Sign up today and start your volunteering journey.
+            {t('cta.sub')}
           </p>
           <div className="flex flex-wrap justify-center gap-4 mt-8">
             <Link to="/register">
@@ -660,7 +610,7 @@ function CTASection() {
                 whileTap={{ scale: 0.97 }}
                 className="inline-flex items-center gap-2 px-6 py-3 bg-card text-foreground font-medium rounded-md hover:bg-card/90 transition-colors shadow-sm"
               >
-                Join Now
+                {t('cta.join')}
                 <ArrowRight className="size-4" />
               </motion.button>
             </Link>
@@ -670,7 +620,7 @@ function CTASection() {
                 whileTap={{ scale: 0.97 }}
                 className="inline-flex items-center gap-2 px-6 py-3 border border-primary-foreground/30 text-primary-foreground font-medium rounded-md hover:bg-primary-foreground/10 transition-colors"
               >
-                Explore Opportunities
+                {t('cta.explore')}
                 <Compass className="size-4" />
               </motion.button>
             </Link>
@@ -683,18 +633,32 @@ function CTASection() {
 
 /* ─── Footer ─── */
 function Footer() {
+  const { t } = useTranslation(['landing', 'common']);
+  const year = new Date().getFullYear();
+  const platformLinks = [
+    t('landing:footer.links.opportunities'),
+    t('landing:footer.links.community'),
+    t('landing:footer.links.blog'),
+    t('landing:footer.links.reports'),
+  ];
+  const companyLinks = [
+    t('landing:footer.links.about'),
+    t('landing:footer.links.privacy'),
+    t('landing:footer.links.terms'),
+    t('landing:footer.links.support'),
+  ];
+
   return (
     <footer className="bg-card border-t border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {/* Brand */}
           <div className="lg:col-span-1">
             <div className="flex items-center gap-2 mb-4">
               <ShieldCheck className="size-6 text-primary" />
-              <span className="text-lg font-bold text-foreground">Volunteero</span>
+              <span className="text-lg font-bold text-foreground">{t('common:brand')}</span>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-              Empowering communities through meaningful volunteer connections.
+              {t('landing:footer.tagline')}
             </p>
             <div className="flex gap-3">
               {[Twitter, Github, Linkedin, Instagram].map((Icon, i) => (
@@ -710,11 +674,10 @@ function Footer() {
             </div>
           </div>
 
-          {/* Links */}
           <div>
-            <h4 className="text-sm font-semibold text-foreground mb-4">Platform</h4>
+            <h4 className="text-sm font-semibold text-foreground mb-4">{t('landing:footer.platform')}</h4>
             <ul className="space-y-2">
-              {["Opportunities", "Community", "Blog", "Reports"].map(link => (
+              {platformLinks.map(link => (
                 <li key={link}>
                   <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{link}</a>
                 </li>
@@ -722,9 +685,9 @@ function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="text-sm font-semibold text-foreground mb-4">Company</h4>
+            <h4 className="text-sm font-semibold text-foreground mb-4">{t('landing:footer.company')}</h4>
             <ul className="space-y-2">
-              {["About", "Privacy Policy", "Terms of Service", "Support"].map(link => (
+              {companyLinks.map(link => (
                 <li key={link}>
                   <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{link}</a>
                 </li>
@@ -732,7 +695,7 @@ function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="text-sm font-semibold text-foreground mb-4">Contact</h4>
+            <h4 className="text-sm font-semibold text-foreground mb-4">{t('landing:footer.contact')}</h4>
             <ul className="space-y-3">
               <li className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Mail className="size-4 text-primary" />
@@ -740,7 +703,7 @@ function Footer() {
               </li>
               <li className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Phone className="size-4 text-primary" />
-                +1 (555) 123-4567
+                +57 (300) 123-4567
               </li>
             </ul>
           </div>
@@ -748,7 +711,7 @@ function Footer() {
 
         <div className="mt-12 pt-6 border-t border-border text-center">
           <p className="text-xs text-muted-foreground">
-            &copy; 2024 Volunteero. All rights reserved. Built with purpose.
+            {t('landing:footer.copyright', { year })}
           </p>
         </div>
       </div>

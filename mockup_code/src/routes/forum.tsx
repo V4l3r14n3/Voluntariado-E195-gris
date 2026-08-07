@@ -1,53 +1,68 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { mockForumMessages, type ForumMessage, mockOrganizations } from "@/lib/mock-data";
+import { PageLoader } from "@/components/PageLoader";
+import { useOrganizations } from "@/lib/queries/organizations";
+import { useForumMessages, useCreateForumMessage } from "@/lib/queries/forum";
 import { toast } from "sonner";
 import { MessageSquare, Send } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/forum")({
   component: ForumPage,
 });
 
 function ForumPage() {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
   const navigate = useNavigate();
-  const [messages, setMessages] = useState<ForumMessage[]>(mockForumMessages);
+  const { t, i18n } = useTranslation(['forum', 'common']);
+  const locale = (i18n.resolvedLanguage || 'es').slice(0, 2) === 'es' ? 'es-CO' : 'en-US';
+  const { data: organizations = [] } = useOrganizations();
+  const approvedOrgs = organizations.filter(o => o.status === 'approved');
+  const defaultOrg = user?.organization_id ?? approvedOrgs[0]?.id ?? '';
+  const [selectedOrg, setSelectedOrg] = useState(defaultOrg);
+  const currentOrg = selectedOrg || defaultOrg;
+  const { data: orgMessages = [] } = useForumMessages(currentOrg || undefined);
+  const createMut = useCreateForumMessage();
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
-  const [selectedOrg, setSelectedOrg] = useState("org1");
 
-  if (!user) { navigate({ to: "/" }); return null; }
+  useEffect(() => {
+    if (authReady && !user) navigate({ to: "/" });
+  }, [authReady, user, navigate]);
 
-  const handlePost = (e: React.FormEvent) => {
+  if (!authReady) return <PageLoader />;
+  if (!user) return null;
+
+  const handlePost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !message.trim()) { toast.error("Title and message are required"); return; }
-
-    const newMsg: ForumMessage = {
-      id: 'fm-' + Date.now(), title, message,
-      authorName: user.name, authorRole: user.role,
-      organizationId: selectedOrg,
-      createdAt: new Date().toISOString(),
-    };
-    setMessages(prev => [newMsg, ...prev]);
-    setTitle(""); setMessage("");
-    toast.success("Message posted!");
+    if (!title.trim() || !message.trim()) { toast.error(t('forum:validation.titleAndMessage')); return; }
+    if (!currentOrg) { toast.error(t('forum:validation.selectOrg')); return; }
+    try {
+      await createMut.mutateAsync({
+        title, message,
+        author_id: user.id, author_role: user.role,
+        organization_id: currentOrg,
+      });
+      setTitle(""); setMessage("");
+      toast.success(t('forum:posted'));
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
   };
-
-  const orgMessages = messages.filter(m => m.organizationId === selectedOrg);
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">Forum</h1>
-        <p className="text-sm text-muted-foreground mt-1">Discuss with your community</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('forum:title')}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{t('forum:subtitle')}</p>
       </div>
 
       {user.role === 'volunteer' && (
         <div className="mb-6">
-          <label className="text-sm font-medium mb-1 block">Select Organization</label>
+          <label className="text-sm font-medium mb-1 block">{t('forum:selectOrg')}</label>
           <select value={selectedOrg} onChange={e => setSelectedOrg(e.target.value)} className="w-full max-w-xs px-3 py-2 text-sm border border-input rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring">
-            {mockOrganizations.filter(o => o.status === 'approved').map(o => (
+            {approvedOrgs.map(o => (
               <option key={o.id} value={o.id}>{o.name}</option>
             ))}
           </select>
@@ -55,11 +70,11 @@ function ForumPage() {
       )}
 
       <div className="bg-card border border-border rounded-sm shadow-sm p-5 mb-6">
-        <h2 className="text-base font-semibold mb-3 flex items-center gap-2"><Send className="size-4" /> Post a Message</h2>
+        <h2 className="text-base font-semibold mb-3 flex items-center gap-2"><Send className="size-4" /> {t('forum:post')}</h2>
         <form onSubmit={handlePost} className="flex flex-col gap-3">
-          <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full px-3 py-2 text-sm border border-input rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Message title" />
-          <textarea value={message} onChange={e => setMessage(e.target.value)} className="w-full px-3 py-2 text-sm border border-input rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring min-h-[80px] resize-none" placeholder="Write your message..." />
-          <button type="submit" className="self-end px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-sm hover:bg-primary/90 transition-colors">Post</button>
+          <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full px-3 py-2 text-sm border border-input rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder={t('forum:titlePh')} />
+          <textarea value={message} onChange={e => setMessage(e.target.value)} className="w-full px-3 py-2 text-sm border border-input rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring min-h-[80px] resize-none" placeholder={t('forum:messagePh')} />
+          <button type="submit" className="self-end px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-sm hover:bg-primary/90 transition-colors">{t('forum:send')}</button>
         </form>
       </div>
 
@@ -71,10 +86,10 @@ function ForumPage() {
                 <h3 className="text-base font-semibold">{msg.title}</h3>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-xs font-medium">{msg.authorName}</span>
-                  <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-sm uppercase tracking-wider ${msg.authorRole === 'organization' ? 'bg-primary/10 text-primary' : 'bg-accent text-accent-foreground'}`}>{msg.authorRole}</span>
+                  <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-sm uppercase tracking-wider ${msg.authorRole === 'organization' ? 'bg-primary/10 text-primary' : 'bg-accent text-accent-foreground'}`}>{t(`common:roles.${msg.authorRole}` as const)}</span>
                 </div>
               </div>
-              <span className="text-xs text-muted-foreground tabular-nums">{new Date(msg.createdAt).toLocaleDateString()}</span>
+              <span className="text-xs text-muted-foreground tabular-nums">{new Date(msg.createdAt).toLocaleDateString(locale)}</span>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">{msg.message}</p>
           </div>
@@ -82,7 +97,7 @@ function ForumPage() {
         {orgMessages.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
             <MessageSquare className="size-8 mx-auto mb-3 opacity-50" />
-            <p className="text-sm">No messages yet. Be the first to post!</p>
+            <p className="text-sm">{t('forum:empty')}</p>
           </div>
         )}
       </div>
